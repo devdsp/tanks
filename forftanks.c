@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <jansson.h>
 #include "ctanks.h"
 #include "forf.h"
 #include "dump.h"
@@ -361,7 +362,7 @@ ft_read_tank(struct forftank         *ftank,
 }
 
 void
-print_header(FILE              *f,
+run_round(json_t            *jroot,
              struct tanks_game *game,
              struct forftank   *forftanks,
              struct tank       *tanks,
@@ -369,42 +370,44 @@ print_header(FILE              *f,
 {
   int i, j;
 
-  fprintf(f, "[[%d,%d],[\n",
-         (int)game->size[0], (int)game->size[1]);
+  json_t *arena_size;
+  arena_size = json_array();
+  json_array_append_new( arena_size, json_integer((int)game->size[0]) );
+  json_array_append_new( arena_size, json_integer((int)game->size[1]) );
+  json_array_append(jroot,arena_size);
+
+  json_t *tank_array;
+  tank_array = json_array();
+
   for (i = 0; i < ntanks; i += 1) {
-    fprintf(f, " [\"%s\",[", forftanks[i].color);
+    json_t *tank, *sensors;
+    tank = json_array();
+    sensors = json_array();
+    json_array_append_new(tank,json_string(forftanks[i].color));
     for (j = 0; j < TANK_MAX_SENSORS; j += 1) {
       struct sensor *s = &(tanks[i].sensors[j]);
+      json_t *sensor;
 
       if (! s->range) {
-        fprintf(f, "0,");
+        sensor = json_null();
       } else {
-        fprintf(f, "[%d,%.2f,%.2f,%d],",
-                (int)(s->range),
-                s->angle,
-                s->width,
-                s->turret);
+        sensor = json_array();
+        json_array_append_new(sensor,json_integer((int)s->range));
+        json_array_append_new(sensor,json_real(s->angle));
+        json_array_append_new(sensor,json_real(s->width));
+        json_array_append_new(sensor,json_boolean(s->turret));
       }
+      json_array_append(sensors,sensor);
     }
-    fprintf(f, "]],\n");
+    json_array_append(tank,sensors);
+    json_array_append(tank_array,tank);
   }
-  fprintf(f, "],[\n");
-}
+  json_array_append(jroot,tank_array);
 
-void
-print_footer(FILE *f)
-{
-  fprintf(f, "]]\n");
-}
-
-void
-print_rounds(FILE *f,
-             struct tanks_game *game,
-             struct tank       *tanks,
-             int                ntanks)
-{
-  int i;
   int alive;
+
+  json_t *rounds;
+  rounds = json_array();
 
   /* Run rounds */
   alive = ntanks;
@@ -412,18 +415,24 @@ print_rounds(FILE *f,
     int j;
 
     tanks_run_turn(game, tanks, ntanks);
-    fprintf(f, "[\n");
+
+    json_t *round;
+    round = json_array();
+
     alive = ntanks;
     for (j = 0; j < ntanks; j += 1) {
       struct tank *t = &(tanks[j]);
 
+      json_t *tank_status;
+
       if (t->killer) {
         alive -= 1;
-        fprintf(f, " 0,\n");
+        tank_status = json_null();
       } else {
         int k;
         int flags   = 0;
         int sensors = 0;
+        tank_status = json_array();
 
         for (k = 0; k < TANK_MAX_SENSORS; k += 1) {
           if (t->sensors[k].triggered) {
@@ -436,17 +445,19 @@ print_rounds(FILE *f,
         if (t->led) {
           flags |= 2;
         }
-        fprintf(f, " [%d,%d,%.2f,%.2f,%d,%d],\n",
-                (int)t->position[0],
-                (int)(t->position[1]),
-                t->angle,
-                t->turret.current,
-                flags,
-                sensors);
+        json_array_append_new(tank_status,json_integer((int)t->position[0]));
+        json_array_append_new(tank_status,json_integer((int)t->position[1]));
+        json_array_append_new(tank_status,json_real(t->angle));
+        json_array_append_new(tank_status,json_real(t->turret.current));
+        json_array_append_new(tank_status,json_integer(flags));
+        json_array_append_new(tank_status,json_integer(sensors));
       }
+      json_array_append(round,tank_status);
     }
-    fprintf(f, "],\n");
+    json_array_append(rounds,round);
+
   }
+  json_array_append(jroot,rounds);
 }
 
 void
@@ -498,7 +509,7 @@ main(int argc, char *argv[])
     }
 
     srand(seed);
-    fprintf(stdout, "// SEED=%d\n", seed);
+    //fprintf(stdout, "// SEED=%d\n", seed);
   }
 
   /* Every argument is a tank directory */
@@ -562,9 +573,16 @@ main(int argc, char *argv[])
     }
   }
 
-  print_header(stdout, &game, myftanks, mytanks, ntanks);
-  print_rounds(stdout, &game, mytanks, ntanks);
-  print_footer(stdout);
+  json_t *jroot;
+  jroot = json_array();
+
+  run_round(jroot, &game, myftanks, mytanks, ntanks);
+
+  char *games;
+  games = json_dumps(jroot,0);
+  fprintf(stdout, games);
+  free(games);
+  games=0;
 
   /* Output standings to fd3.
   *
