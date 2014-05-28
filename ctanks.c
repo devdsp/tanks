@@ -105,17 +105,13 @@ rotate_point(float angle, float point[2])
   point[1] = new[1];
 }
 
-
 static void
-tanks_fire_cannon(struct tanks_game *game,
-                  struct tank *this,
-                  struct tank *that,
-                  float vector[2],
-                  float dist2)
+tanks_collision_detect(struct tanks_game *game,
+                       struct tank *this,
+                       struct tank *that,
+                       float vector[2],
+                       float dist2)
 {
-  float theta = this->angle + this->turret.current;
-  float rpos[2];
-
   /* If someone's a crater, this is easy */
   if (this->killer || that->killer) {
     return;
@@ -128,18 +124,32 @@ tanks_fire_cannon(struct tanks_game *game,
 
     that->killer = this;
     that->cause_death = "collision";
+  }
+}
 
-    return;
+static int
+tanks_fire_cannon(struct tanks_game *game,
+                  struct tank *this,
+                  struct tank *that,
+                  float vector[2],
+                  float dist2)
+{
+  float theta = this->angle + this->turret.current;
+  float rpos[2];
+
+  /* If someone's a crater, this is easy */
+  if (this->killer || that->killer) {
+    return 0;
   }
 
   /* No need to check if it's not even firing */
   if (! this->turret.firing) {
-    return;
+    return 0;
   }
 
   /* Also no need to check if it's outside cannon range */
   if (dist2 > TANK_CANNON_ADJ2) {
-    return;
+    return 0;
   }
 
   /* Did this shoot that?  Rotate point by turret degrees, and if |y| <
@@ -147,10 +157,7 @@ tanks_fire_cannon(struct tanks_game *game,
   rpos[0] = vector[0];
   rpos[1] = vector[1];
   rotate_point(-theta, rpos);
-  if ((rpos[0] > 0) && (fabsf(rpos[1]) < TANK_RADIUS)) {
-    that->killer = this;
-    that->cause_death = "shot";
-  }
+  return ((rpos[0] > 0) && (fabsf(rpos[1]) < TANK_RADIUS));
 }
 
 static void
@@ -428,10 +435,21 @@ tanks_run_turn(struct tanks_game *game, struct tank *tanks, int ntanks)
       struct tank *that = &tanks[j];
 
       compute_vector(game, vector, &dist2, this, that);
-      tanks_fire_cannon(game, this, that, vector, dist2);
+      tanks_collision_detect(game, that, this, vector, dist2);
+      int a,b;
+      a = tanks_fire_cannon(game, this, that, vector, dist2);
       vector[0] = -vector[0];
       vector[1] = -vector[1];
-      tanks_fire_cannon(game, that, this, vector, dist2);
+      b = tanks_fire_cannon(game, that, this, vector, dist2);
+
+      if(a){
+        that->killer = this;
+        that->cause_death = "shot";
+      }
+      if(b){
+        this->killer = that;
+        this->cause_death = "shot";
+      }
     }
   }
 }
