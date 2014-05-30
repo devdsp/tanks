@@ -10,6 +10,8 @@ install:
 	install -d $(DESTDIR)/usr/bin
 	install run-tanks $(DESTDIR)/usr/bin
 	install forftanks $(DESTDIR)/usr/bin
+	install $(SCRIPTS) $(DESTDIR)/usr/bin
+
 
 	install -d $(DESTDIR)/usr/lib/tanks
 	install designer.cgi $(DESTDIR)/usr/lib/tanks
