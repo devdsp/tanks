@@ -1,5 +1,5 @@
 BINARIES = forftanks designer.cgi
-HTML = forf.html procs.html intro.html designer.html
+HTML = forf.html procs.html intro.html designer.html chord.html
 WWW = style.css grunge.png designer.js figures.js tanks.js nav.html.inc
 
 CFLAGS = -Wall
@@ -28,5 +28,5 @@ ctanks.o: ctanks.h
 	m4 $< > $@
 
 clean:
-	rm -f *.o next-round round-*.html
+	rm -f *.o next-round round-*.html results-*.txt
 	rm -f $(BINARIES) $(HTML)

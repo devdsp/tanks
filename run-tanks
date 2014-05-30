@@ -22,7 +22,7 @@ fi
 expr $next + 1 > next-round
 
 fn=$(printf "round-%04d.html" $next)
-rfn=results$$.txt
+rfn=$(printf "results-%04d.txt" $next)
 
 
 echo -n "Running round $next... "
@@ -52,7 +52,6 @@ window.onload = go;
     <p><span id="fps">0</span> fps</p>
 EOF
 rank.awk $rfn >>$fn
-rm -f $rfn
 cat $NAV_HTML_INC >>$fn
 cat <<EOF >>$fn
   </body>
@@ -61,6 +60,10 @@ EOF
 
 summary.awk $tanks > summary.html.$$
 mv summary.html.$$ summary.html
+
+./killmatrix.pl results-*.txt > killmatrix$$.js
+
+mv killmatrix$$.js killmatrix.js
 
 echo "done."
 

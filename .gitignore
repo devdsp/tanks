@@ -1,8 +1,10 @@
 *~
 *#
 *.o
+*.swp
 
 round-*.html
+results-*.txt
 next-round
 points
 forftanks
@@ -14,3 +16,5 @@ summary.html
 designer.html
 intro.html
 procs.html
+chord.html
+killmatrix.js
