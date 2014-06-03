@@ -20,7 +20,7 @@ install:
 	cp -r examples $(DESTDIR)/usr/lib/tanks/examples
 
 forftanks: forftanks.o ctanks.o forf.o
-forftanks: LDFLAGS = -lm
+forftanks: LDLIBS = -lm
 
 forftanks.o: forf.h ctanks.h
 forf.o: forf.c forf.h
@@ -29,6 +29,7 @@ ctanks.o: ctanks.h
 %.html: %.html.m4
 	m4 $< > $@
 
+.PHONY: clean
 clean:
 	rm -f *.o next-round round-*.html results-*.txt
 	rm -f $(BINARIES) $(HTML)
