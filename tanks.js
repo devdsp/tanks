@@ -157,16 +157,16 @@ function start(id, game) {
     var ctx = canvas.getContext('2d');
     var loop_id;
 
-    canvas.width = game[0][0];
-    canvas.height = game[0][1];
+    canvas.width = game.size.width;
+    canvas.height = game.size.height;
     // game[2] is tank descriptions
-    var turns = game[2];
+    var turns = game.turns;
 
     // Set up tanks
     var tanks = new Array();
-    for (i in game[1]) {
-        var desc = game[1][i];
-        tanks[i] = new Tank(ctx, game[0][0], game[0][1], desc[0], desc[1]);
+    for (i in game.tanks) {
+        var desc = game.tanks[i];
+        tanks[i] = new Tank(ctx, game.size.width, game.size.height, desc.color, desc.sensors);
     }
 
     var frame = 0;
@@ -202,7 +202,7 @@ function start(id, game) {
             t = turn[i];
             if (t) {
                 // Surely there's a better way to do this.
-                tanks[i].set_state(t[0], t[1], t[2], t[3], t[4], t[5]);
+                tanks[i].set_state(t.pos.x, t.pos.y, t.angle, t.turret, t.flags, t.sensors);
                 tanks[i].draw_wrap_sensors();
             }
         }

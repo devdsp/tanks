@@ -371,19 +371,19 @@ run_round(json_t            *jroot,
   int i, j;
 
   json_t *arena_size;
-  arena_size = json_array();
-  json_array_append_new( arena_size, json_integer((int)game->size[0]) );
-  json_array_append_new( arena_size, json_integer((int)game->size[1]) );
-  json_array_append(jroot,arena_size);
+  arena_size = json_object();
+  json_object_set( arena_size,"width", json_integer((int)game->size[0]) );
+  json_object_set( arena_size,"height", json_integer((int)game->size[1]) );
+  json_object_set( jroot ,"size",arena_size);
 
   json_t *tank_array;
   tank_array = json_array();
 
   for (i = 0; i < ntanks; i += 1) {
     json_t *tank, *sensors;
-    tank = json_array();
+    tank = json_object();
     sensors = json_array();
-    json_array_append_new(tank,json_string(forftanks[i].color));
+    json_object_set(tank,"color",json_string(forftanks[i].color));
     for (j = 0; j < TANK_MAX_SENSORS; j += 1) {
       struct sensor *s = &(tanks[i].sensors[j]);
       json_t *sensor;
@@ -399,10 +399,10 @@ run_round(json_t            *jroot,
       }
       json_array_append(sensors,sensor);
     }
-    json_array_append(tank,sensors);
+    json_object_set(tank,"sensors",sensors);
     json_array_append(tank_array,tank);
   }
-  json_array_append(jroot,tank_array);
+  json_object_set(jroot,"tanks",tank_array);
 
   int alive;
 
@@ -432,7 +432,11 @@ run_round(json_t            *jroot,
         int k;
         int flags   = 0;
         int sensors = 0;
-        tank_status = json_array();
+        tank_status = json_object();
+        json_t *position;
+        position = json_object();
+
+        json_object_set(tank_status,"pos",position);
 
         for (k = 0; k < TANK_MAX_SENSORS; k += 1) {
           if (t->sensors[k].triggered) {
@@ -445,19 +449,20 @@ run_round(json_t            *jroot,
         if (t->led) {
           flags |= 2;
         }
-        json_array_append_new(tank_status,json_integer((int)t->position[0]));
-        json_array_append_new(tank_status,json_integer((int)t->position[1]));
-        json_array_append_new(tank_status,json_real(t->angle));
-        json_array_append_new(tank_status,json_real(t->turret.current));
-        json_array_append_new(tank_status,json_integer(flags));
-        json_array_append_new(tank_status,json_integer(sensors));
+
+        json_object_set(position,"x",json_integer((int)t->position[0]));
+        json_object_set(position,"y",json_integer((int)t->position[1]));
+        json_object_set(tank_status,"angle",json_real(t->angle));
+        json_object_set(tank_status,"turret",json_real(t->turret.current));
+        json_object_set(tank_status,"flags",json_integer(flags));
+        json_object_set(tank_status,"sensors",json_integer(sensors));
       }
       json_array_append(round,tank_status);
     }
     json_array_append(rounds,round);
 
   }
-  json_array_append(jroot,rounds);
+  json_object_set(jroot,"turns",rounds);
 }
 
 void
@@ -574,7 +579,7 @@ main(int argc, char *argv[])
   }
 
   json_t *jroot;
-  jroot = json_array();
+  jroot = json_object();
 
   run_round(jroot, &game, myftanks, mytanks, ntanks);
 
