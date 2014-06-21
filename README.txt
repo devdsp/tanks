@@ -18,7 +18,7 @@ hodgepodge of C, Bourne shell, and awk, but at least each piece is
 fairly simple to audit.
 
 
-### round.sh tank1 tank2 ...
+### run-tanks tank1 tank2 ...
 
 Runs a single round, awards points with rank.awk, and creates a new
 summary.html with summary.awk.  This is the main interface that you want

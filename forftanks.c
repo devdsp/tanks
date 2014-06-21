@@ -20,13 +20,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <ctype.h>
 #include "ctanks.h"
 #include "forf.h"
 #include "dump.h"
+#include "tankdef.h"
+#include "tankdir.h"
+#include "tankjson.h"
 
 #define MAX_TANKS 50
 #define ROUNDS 500
 #define SPACING 150
+
+#define MAX_JSON_SIZE 10000
 
 #define LENV_SIZE 100
 
@@ -194,34 +200,6 @@ struct forf_lexical_env tanks_lenv_addons[] = {
  * Filesystem stuff
  *
  */
-
-int
-ft_read_file(char *ptr, size_t size, char *dir, char *fn)
-{
-  char  path[256];
-  FILE *f       = NULL;
-  int   ret;
-  int   success = 0;
-
-  do {
-    snprintf(path, sizeof(path), "%s/%s", dir, fn);
-    f = fopen(path, "r");
-    if (! f) break;
-
-    ret = fread(ptr, 1, size - 1, f);
-    ptr[ret] = '\0';
-    if (! ret) break;
-
-    success = 1;
-  } while (0);
-
-  if (f) fclose(f);
-  if (! success) {
-    return 0;
-  }
-  return 1;
-}
-
 void
 ft_bricked_tank(struct tank *tank, void *ignored)
 {
@@ -244,33 +222,17 @@ ft_run_tank(struct tank *tank, struct forftank *ftank)
   }
 }
 
-int
+int //&L Added function
 ft_read_program(struct forftank         *ftank,
-                struct tank             *tank,
-                struct forf_lexical_env *lenv,
-                char                    *path)
+                 struct tank             *tank,
+                 struct tankdef          *tank_def)
 {
-  char  progpath[256];
-  FILE *f;
-
-  /* Open program */
-  snprintf(progpath, sizeof(progpath), "%s/program", path);
-  f = fopen(progpath, "r");
-  if (! f) return 0;
-
-  /* Parse program */
-  ftank->error_pos = forf_parse_file(&ftank->env, f);
-  fclose(f);
+  ftank->error_pos = forf_parse_string(&ftank->env, tank_def->program);
   if (ftank->error_pos) {
     return 0;
   }
-
-  /* Back up the program so we can run it over and over without
-     needing to re-parse */
   forf_stack_copy(&ftank->_prog, &ftank->_cmd);
-
   tank_init(tank, (tank_run_func *)ft_run_tank, ftank);
-
   return 1;
 }
 
@@ -292,71 +254,71 @@ ft_tank_init(struct forftank         *ftank,
                 tank);
 }
 
-void
-ft_read_sensors(struct tank *tank,
-                char        *path)
+void //&L Added function
+ft_read_sensors(struct tank    *tank,
+                 struct tankdef *tankdef)
 {
   int i;
 
   for (i = 0; i < TANK_MAX_SENSORS; i += 1) {
-    int   ret;
-    char  fn[10];
-    char  s[20];
-    char *p = s;
     long  range;
-    long  angle;
-    long  width;
+    double  angle;
+    double  width;
     long  turret;
 
-    snprintf(fn, sizeof(fn), "sensor%d", i);
-    ret = ft_read_file(s, sizeof(s), path, fn);
-    if (! ret) {
-      s[0] = 0;
-    }
-    range = strtol(p, &p, 0);
-    angle = strtol(p, &p, 0);
-    width = strtol(p, &p, 0);
-    turret = strtol(p, &p, 0);
+    range = tankdef->sensors[i].range;
+    angle = tankdef->sensors[i].angle;
+    width = tankdef->sensors[i].width;
+    turret = tankdef->sensors[i].turret;
 
     tank->sensors[i].range = min(range, TANK_SENSOR_RANGE);
-    tank->sensors[i].angle = deg2rad(angle % 360);
-    tank->sensors[i].width = deg2rad(width % 360);
+    tank->sensors[i].angle = deg2rad((long)angle % 360);
+    tank->sensors[i].width = deg2rad((long)width % 360);
     tank->sensors[i].turret = (0 != turret);
   }
 }
 
-int
+char* //&L Added function.
+temp_parse_path(char* tankName)
+{
+  size_t inTankName;
+  size_t inPath;
+  char* retVal = (char*)malloc(strlen(tankName)*sizeof(char));
+  for(inTankName=0, inPath=0; inTankName<strlen(tankName); inTankName++) {
+    if( !isalnum(tankName[inTankName]) ) {
+      continue;
+    } else if( isupper(tankName[inTankName]) ) {
+      retVal[inPath] = (char)tolower(tankName[inTankName]);
+    } else {
+      retVal[inPath] = (char)tankName[inTankName];
+    }
+    inPath++;
+  }
+  retVal[inPath] = (char)'\0'; // Null terminate.
+  return retVal;
+}
+
+int //&L Added function
 ft_read_tank(struct forftank         *ftank,
              struct tank             *tank,
              struct forf_lexical_env *lenv,
-             char                    *path)
+             struct tankdef          *tank_def)
 {
   int ret;
-
-  ftank->path = path;
-
+  ftank->path = temp_parse_path(tank_def->name); // No path anymore.
   /* What is your name? */
-  ret = ft_read_file(ftank->name, sizeof(ftank->name), path, "name");
-  if (! ret) {
-    strncpy(ftank->name, path, sizeof(ftank->name));
-  }
-
+  strncpy(ftank->name, tank_def->name, sizeof(ftank->name));
   /* What is your quest? */
   ft_tank_init(ftank, tank, lenv);
-  ret = ft_read_program(ftank, tank, lenv, path);
+  ret = ft_read_program(ftank, tank, tank_def);
   if (ret) {
-    ft_read_sensors(tank, path);
+    ft_read_sensors(tank, tank_def);
   } else {
     /* Brick the tank */
     tank_init(tank, ft_bricked_tank, NULL);
   }
-
   /* What is your favorite color? */
-  ret = ft_read_file(ftank->color, sizeof(ftank->color), path, "color");
-  if (! ret) {
-    strncpy(ftank->color, "#808080", sizeof(ftank->color));
-  }
-
+  strncpy(ftank->color, tank_def->color, sizeof(ftank->color));
   return 1;
 }
 
@@ -469,10 +431,24 @@ print_standings(FILE            *f,
   }
 }
 
+void
+delete_tank(struct forftank theTank) {
+  free(theTank.path);
+}
+
+void
+delete_tanks(struct forftank* myftanks, const int ntanks) {
+  int i;
+  for(i=0; i<ntanks; i++) {
+    delete_tank(myftanks[i]);
+  }
+}
+
 int
 main(int argc, char *argv[])
 {
   struct tanks_game       game;
+  struct tankdef          mytankdefs[MAX_TANKS];
   struct forftank         myftanks[MAX_TANKS];
   struct tank             mytanks[MAX_TANKS];
   struct forf_lexical_env lenv[LENV_SIZE];
@@ -501,19 +477,47 @@ main(int argc, char *argv[])
     fprintf(stdout, "// SEED=%d\n", seed);
   }
 
-  /* Every argument is a tank directory */
-  for (i = 1; ntanks < MAX_TANKS && i < argc; i += 1) {
-    if (ft_read_tank(&myftanks[ntanks],
-                     &mytanks[ntanks],
-                     lenv,
-                     argv[i])) {
-      ntanks += 1;
+  if(argc > 1){
+    /* Every argument is a tank directory */
+    ntanks = argc-1; // argc[0] is program name, not a tank.
+    if(ntanks > MAX_TANKS) {
+      fprintf(stderr, "Too many tanks! Tried to load: %d, Max: %d",
+                      ntanks, MAX_TANKS);
+      return 1;
     }
+    for (i = 0; i < ntanks; i++) { //&L changed loop.
+      mytankdefs[i] = readTankFromDir(argv[i+1]);
+    }
+  } else { // Expecting JSON on stdin.
+    char* jsonString = malloc(sizeof(char)*MAX_JSON_SIZE);
+    char c;
+    long size = 0;
+    while( (c=fgetc(stdin)) != EOF ) {
+      jsonString[size] = c;
+      size++;
+      if(size>=(MAX_JSON_SIZE-1)) {
+        fprintf(stderr,"Error: JSON text too large.\n");
+        return 1;
+      }
+    }
+    jsonString[size] = '\0';
+    ntanks = jsonArraySize(jsonString); // argc[0] is program name, not a tank.
+    if(ntanks > MAX_TANKS) {
+      fprintf(stderr, "Too many tanks! Tried to load: %d, Max: %d",
+                      ntanks, MAX_TANKS);
+      return 1;
+    }
+    readTanksFromJSON(mytankdefs, ntanks, jsonString);
   }
-
   if (0 == ntanks) {
     fprintf(stderr, "No usable tanks!\n");
     return 1;
+  }
+  for(i=0; i < ntanks; i++) {
+    ft_read_tank(&myftanks[i],
+                 &mytanks[i],
+                 lenv,
+                 &mytankdefs[i]);
   }
 
   /* Calculate the size of the game board */
@@ -580,6 +584,8 @@ main(int argc, char *argv[])
       print_standings(standings, myftanks, mytanks, ntanks);
     }
   }
+  
+  delete_tanks(myftanks, ntanks);
 
   return 0;
 }
