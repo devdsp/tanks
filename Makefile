@@ -32,7 +32,7 @@ install: check-env
 	cp -r examples $(DOCROOT)/examples
 
 clean:
-	rm -f *.o next-round round-*.html results-*.txt
+	rm -f *.o next-round round-*.html round-*.json results-*.txt current.html
 	rm -f $(BINARIES) $(HTML)
 
 check-env:

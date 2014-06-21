@@ -5,9 +5,9 @@ BEGIN {
 }
 
 function esc(s) {
-    gsub(/&/, "&amp;", s);
-    gsub(/</, "&lt;", s);
-    gsub(/>/, "&gt;", s);
+    gsub(/&/, "\\&amp;", s);
+    gsub(/</, "\\&lt;", s);
+    gsub(/>/, "\\&gt;", s);
     return s;
 }
 
